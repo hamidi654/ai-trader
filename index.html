@@ -1,1 +1,292 @@
-<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0f172a"><link rel="manifest" href="/ai-trader/manifest.json"><title>AI Trader</title><style>body{margin:0;background:#0b1220;color:#e5e7eb;font-family:Tahoma,Arial;padding:18px}h1{margin-top:0}.c{background:#111827;border:1px solid #263244;border-radius:16px;padding:16px;margin:10px 0}.v{font-size:22px;font-weight:bold}button{width:100%;padding:14px;margin-top:8px;border:0;border-radius:12px;background:#2563eb;color:white;font-size:15px}.g{display:grid;grid-template-columns:1fr 1fr;gap:10px}.buy{color:#4ade80}.sell{color:#fb7185}.wait{color:#fbbf24}.note{color:#94a3b8;font-size:12px;line-height:1.8}</style></head><body><h1>AI Trader <small>● DEMO</small></h1><div class="g"><div class="c">موجودی<div class="v">$10,000</div></div><div class="c">Equity<div class="v">$10,000</div></div><div class="c">سود/زیان امروز<div class="v buy">+$0</div></div><div class="c">معاملات باز<div class="v">0</div></div></div><div class="c"><h3>سیگنال‌های AI</h3><p>🥇 XAUUSD — <b class="buy">BUY 82%</b></p><p>🛢️ WTI — <b class="wait">NO TRADE 48%</b></p><p>💵 EURUSD — <b class="sell">SELL 71%</b></p></div><div class="c"><h3>کنترل ربات</h3><button id="install" hidden>📱 نصب AI Trader</button><button id="toggle">شروع ربات Demo</button><button id="stop" style="background:#991b1b">توقف اضطراری</button><p id="log" class="note">نسخه آزمایشی؛ بدون اتصال به حساب واقعی.</p></div><script>let d=null,r=false;addEventListener('beforeinstallprompt',e=>{e.preventDefault();d=e;install.hidden=false});install.onclick=async()=>{if(d){d.prompt();await d.userChoice;d=null;install.hidden=true}};toggle.onclick=()=>{r=!r;toggle.textContent=r?'توقف ربات':'شروع ربات Demo';log.textContent=r?'ربات Demo فعال است؛ سفارش واقعی ارسال نمی‌شود.':'ربات متوقف است.'};stop.onclick=()=>{r=false;toggle.textContent='شروع ربات Demo';log.textContent='توقف اضطراری فعال شد.'};navigator.serviceWorker&&navigator.serviceWorker.register('/ai-trader/sw.js');</script></body></html>
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#071a3d">
+  <title>AI Trader - Demo</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Tahoma, Arial, sans-serif;
+      background: #071a3d;
+      color: white;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 5px;
+    }
+
+    .demo {
+      text-align: center;
+      color: #67e8f9;
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .card {
+      background: #102b5c;
+      border-radius: 12px;
+      padding: 18px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,.25);
+    }
+
+    .title {
+      color: #b8c7e6;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .value {
+      font-size: 25px;
+      font-weight: bold;
+    }
+
+    .market {
+      margin-top: 20px;
+      background: #0d2550;
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .market h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 5px;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+
+    .row:last-child {
+      border-bottom: none;
+    }
+
+    .symbol {
+      font-weight: bold;
+    }
+
+    .price {
+      font-size: 19px;
+      color: #67e8f9;
+    }
+
+    .signal {
+      font-size: 13px;
+      color: #a7f3d0;
+    }
+
+    button {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .refresh {
+      background: #19c9e8;
+      color: #00152f;
+    }
+
+    .stop {
+      background: #ff4d5a;
+      color: white;
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 15px;
+      color: #b8c7e6;
+      font-size: 13px;
+    }
+
+    .error {
+      color: #ff8a8a;
+    }
+
+    @media (max-width: 600px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .container {
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>AI Trader</h1>
+  <div class="demo">● DEMO MODE</div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="title">موجودی</div>
+      <div class="value">$10,000</div>
+    </div>
+
+    <div class="card">
+      <div class="title">Equity</div>
+      <div class="value" id="equity">$10,000</div>
+    </div>
+
+    <div class="card">
+      <div class="title">معاملات باز</div>
+      <div class="value">0</div>
+    </div>
+
+    <div class="card">
+      <div class="title">سود / زیان</div>
+      <div class="value" id="profit">$0</div>
+    </div>
+  </div>
+
+  <div class="market">
+    <h2>📊 بازارهای زنده</h2>
+
+    <div class="row">
+      <div>
+        <div class="symbol">XAU/USD — طلا</div>
+        <div class="signal" id="goldSignal">در حال بررسی...</div>
+      </div>
+      <div class="price" id="goldPrice">--</div>
+    </div>
+
+    <div class="row">
+      <div>
+        <div class="symbol">WTI/USD — نفت</div>
+        <div class="signal" id="oilSignal">در حال بررسی...</div>
+      </div>
+      <div class="price" id="oilPrice">--</div>
+    </div>
+
+    <div class="row">
+      <div>
+        <div class="symbol">EUR/USD</div>
+        <div class="signal" id="eurSignal">در حال بررسی...</div>
+      </div>
+      <div class="price" id="eurPrice">--</div>
+    </div>
+
+    <button class="refresh" onclick="loadMarket()">
+      🔄 بروزرسانی قیمت‌ها
+    </button>
+
+    <button class="stop" onclick="demoStop()">
+      ⛔ توقف اضطراری Demo
+    </button>
+
+    <div class="status" id="status">
+      در حال اتصال به بازار...
+    </div>
+  </div>
+
+</div>
+
+<script>
+async function loadMarket() {
+  const status = document.getElementById("status");
+
+  status.className = "status";
+  status.textContent = "در حال دریافت قیمت‌های بازار...";
+
+  try {
+    const response = await fetch("/api/market", {
+      cache: "no-store"
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || "خطا در دریافت اطلاعات");
+    }
+
+    const data = result.data;
+
+    if (data.gold && data.gold.price) {
+      document.getElementById("goldPrice").textContent =
+        "$" + Number(data.gold.price).toFixed(2);
+
+      document.getElementById("goldSignal").textContent =
+        "داده واقعی بازار ✓";
+    } else {
+      document.getElementById("goldPrice").textContent = "--";
+      document.getElementById("goldSignal").textContent = "داده در دسترس نیست";
+    }
+
+    if (data.oil && data.oil.price) {
+      document.getElementById("oilPrice").textContent =
+        "$" + Number(data.oil.price).toFixed(2);
+
+      document.getElementById("oilSignal").textContent =
+        "داده واقعی بازار ✓";
+    } else {
+      document.getElementById("oilPrice").textContent = "--";
+      document.getElementById("oilSignal").textContent = "داده در دسترس نیست";
+    }
+
+    if (data.eurusd && data.eurusd.price) {
+      document.getElementById("eurPrice").textContent =
+        Number(data.eurusd.price).toFixed(5);
+
+      document.getElementById("eurSignal").textContent =
+        "داده واقعی بازار ✓";
+    } else {
+      document.getElementById("eurPrice").textContent = "--";
+      document.getElementById("eurSignal").textContent = "داده در دسترس نیست";
+    }
+
+    status.textContent =
+      "آخرین بروزرسانی: " + new Date().toLocaleTimeString("fa-IR");
+
+  } catch (error) {
+    console.error(error);
+
+    status.className = "status error";
+    status.textContent =
+      "خطا در دریافت قیمت‌ها: " + error.message;
+  }
+}
+
+function demoStop() {
+  alert("ربات Demo متوقف شد. هیچ معامله واقعی انجام نمی‌شود.");
+}
+
+loadMarket();
+
+setInterval(loadMarket, 60000);
+</script>
+
+</body>
+</html>
