@@ -1,7 +1,6 @@
 export default async function handler(req, res) {
   try {
-    const apiKey = process.env.TWELVE_DATA_API_KEY;
-
+    const apiKey = process.env.TWELVE_DATA
     if (!apiKey) {
       return res.status(500).json({
         error: "TWELVE_DATA_API_KEY is not configured"
