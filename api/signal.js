@@ -36,59 +36,157 @@ export default async function handler(req, res) {
 
     // محاسبه سیگنال بر اساس روند کوتاه‌مدت
     function calculateSignal(prices) {
-      if (!prices || prices.length < 5) {
-        return {
-          signal: "NO TRADE",
-          confidence: 0,
-          reason: "Insufficient data"
-        };
-      }
+      function calculateSignal(prices) {
+  if (!prices || prices.length < 15) {
+    return {
+      signal: "NO TRADE",
+      confidence: 0,
+      reason: "Insufficient data"
+    };
+  }
 
-      const values = prices
-        .map(Number)
-        .filter(v => Number.isFinite(v));
+  const values = prices
+    .map(Number)
+    .filter(v => Number.isFinite(v));
 
-      if (values.length < 5) {
-        return {
-          signal: "NO TRADE",
-          confidence: 0,
-          reason: "Invalid price data"
-        };
-      }
+  if (values.length < 15) {
+    return {
+      signal: "NO TRADE",
+      confidence: 0,
+      reason: "Insufficient valid price data"
+    };
+  }
 
-      const short = values.slice(-3);
-      const long = values.slice(-5);
+  // EMA
+  function calculateEMA(data, period) {
+    const multiplier = 2 / (period + 1);
+    let ema = data[0];
 
-      const shortAverage =
-        short.reduce((a, b) => a + b, 0) / short.length;
-
-      const longAverage =
-        long.reduce((a, b) => a + b, 0) / long.length;
-
-      const last = values[values.length - 1];
-
-      if (shortAverage > longAverage && last > shortAverage) {
-        return {
-          signal: "BUY",
-          confidence: 70,
-          reason: "Short-term trend is upward"
-        };
-      }
-
-      if (shortAverage < longAverage && last < shortAverage) {
-        return {
-          signal: "SELL",
-          confidence: 70,
-          reason: "Short-term trend is downward"
-        };
-      }
-
-      return {
-        signal: "NO TRADE",
-        confidence: 50,
-        reason: "Trend is unclear"
-      };
+    for (let i = 1; i < data.length; i++) {
+      ema =
+        (data[i] - ema) * multiplier +
+        ema;
     }
+
+    return ema;
+  }
+
+  // RSI
+  function calculateRSI(data, period = 14) {
+    if (data.length <= period) {
+      return 50;
+    }
+
+    let gains = 0;
+    let losses = 0;
+
+    for (let i = 1; i <= period; i++) {
+      const change = data[i] - data[i - 1];
+
+      if (change > 0) {
+        gains += change;
+      } else {
+        losses += Math.abs(change);
+      }
+    }
+
+    let averageGain = gains / period;
+    let averageLoss = losses / period;
+
+    for (let i = period + 1; i < data.length; i++) {
+      const change = data[i] - data[i - 1];
+
+      const gain = change > 0 ? change : 0;
+      const loss = change < 0 ? Math.abs(change) : 0;
+
+      averageGain =
+        ((averageGain * (period - 1)) + gain) / period;
+
+      averageLoss =
+        ((averageLoss * (period - 1)) + loss) / period;
+    }
+
+    if (averageLoss === 0) {
+      return 100;
+    }
+
+    const rs = averageGain / averageLoss;
+
+    return 100 - (100 / (1 + rs));
+  }
+
+  const lastPrice = values[values.length - 1];
+
+  const ema9 = calculateEMA(values, 9);
+  const ema14 = calculateEMA(values, 14);
+  const rsi = calculateRSI(values, 14);
+
+  let score = 0;
+
+  // EMA trend
+  if (ema9 > ema14) {
+    score += 1;
+  } else if (ema9 < ema14) {
+    score -= 1;
+  }
+
+  // Price position
+  if (lastPrice > ema9) {
+    score += 1;
+  } else if (lastPrice < ema9) {
+    score -= 1;
+  }
+
+  // RSI
+  if (rsi >= 55 && rsi < 70) {
+    score += 1;
+  } else if (rsi <= 45 && rsi > 30) {
+    score -= 1;
+  }
+
+  // Strong overbought / oversold conditions
+  if (rsi >= 70) {
+    score -= 1;
+  }
+
+  if (rsi <= 30) {
+    score += 1;
+  }
+
+  let signal = "NO TRADE";
+  let confidence = 50;
+  let reason = "Trend is unclear";
+
+  if (score >= 3) {
+    signal = "BUY";
+    confidence = 80;
+    reason = "Bullish EMA trend with supportive RSI";
+  } else if (score === 2) {
+    signal = "BUY";
+    confidence = 70;
+    reason = "Short-term bullish trend";
+  } else if (score <= -3) {
+    signal = "SELL";
+    confidence = 80;
+    reason = "Bearish EMA trend with supportive RSI";
+  } else if (score === -2) {
+    signal = "SELL";
+    confidence = 70;
+    reason = "Short-term bearish trend";
+  }
+
+  return {
+    signal,
+    confidence,
+    reason,
+    indicators: {
+      price: Number(lastPrice.toFixed(5)),
+      ema9: Number(ema9.toFixed(5)),
+      ema14: Number(ema14.toFixed(5)),
+      rsi: Number(rsi.toFixed(2))
+    }
+  };
+}
 
     // دریافت داده تاریخی از Twelve Data
     async function getTwelveData(symbol) {
