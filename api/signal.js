@@ -36,7 +36,6 @@ export default async function handler(req, res) { {
 
     // محاسبه سیگنال بر اساس روند کوتاه‌مدت
     function calculateSignal(prices) {
-      function calculateSignal(prices) {
   if (!prices || prices.length < 15) {
     return {
       signal: "NO TRADE",
